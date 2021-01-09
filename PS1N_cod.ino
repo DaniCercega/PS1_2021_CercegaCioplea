@@ -9,13 +9,13 @@
 #define BUTTON_NEXT 5
  
 typedef struct Parametrii{
-  double temp = 36.6;
-  int sec_INC = 10;
-  int sec_MEN = 20;
-  int sec_RAC = 10;
+  double temp = 22;
+  int sec_INC = 20;
+  int sec_MEN = 1000;
+  int sec_RAC = 100;
   double kp = 5;
-  double ki = 0.1;
-  double kd = 0.1;
+  double ki = 0.5;
+  double kd = 2;
 } Parametrii;
  
 Parametrii pars;
@@ -136,43 +136,43 @@ void go_prev(void)
   scroll_menu = (Menus) ((int)scroll_menu % MENU_MAX_NUM);
 }
  
-void save_kp(void){kp = pars.kp;}
+void save_kp(void){ pars.kp = kp;}
  
 void inc_kp(void){kp+=0.1;}
  
 void dec_kp(void){kp-=0.1;}
  
-void save_kd(void){kd = pars.kd;}
+void save_kd(void){ pars.kd = kd;}
  
 void inc_kd(void){kd+=0.1;}
  
 void dec_kd(void){kd-=0.1;}
  
-void save_ki(void){ki = pars.ki;}
+void save_ki(void){pars.ki = ki;}
  
 void inc_ki(void){ki+=0.1;}
  
 void dec_ki(void){ki-=0.1;}
  
-void save_temp(void){temp = pars.temp;}
+void save_temp(void){pars.temp = temp;}
  
 void inc_temp(void){temp++;}
  
 void dec_temp(void){temp--;}
  
-void save_sec_INC(void){sec_INC = pars.sec_INC;}
+void save_sec_INC(void){ pars.sec_INC = sec_INC;}
  
 void inc_sec_INC(void){sec_INC++;}
  
 void dec_sec_INC(void){sec_INC--;}
  
-void save_sec_MEN(void){sec_MEN = pars.sec_MEN;}
+void save_sec_MEN(void){ pars.sec_MEN = sec_MEN ;}
  
 void inc_sec_MEN(void){sec_MEN++;}
  
 void dec_sec_MEN(void){sec_MEN--;}
  
-void save_sec_RAC(void){sec_RAC = pars.sec_RAC;}
+void save_sec_RAC(void){pars.sec_RAC = sec_RAC ;}
  
 void inc_sec_RAC(void){sec_RAC++;}
  
@@ -228,7 +228,6 @@ int sampleRate = 1000; // timp esantionare (in milisecunde
 
 void timer1()
 {
-  DDRB |= 1 << PB5; // dev pin
   TCCR1A = 0;
   TCCR1B = 0;
   TCCR1B |= (1 << WGM12) | (1 << CS12) | _BV(CS10) ;
@@ -266,7 +265,7 @@ double derivativa = 0;
  
 double dt = sampleRate/1000; // timp esantionare (in secunde)
  
-double setpoint = 30;
+double setpoint = 45;
  
 int output;
  
@@ -302,22 +301,27 @@ void calculare_moving_sp (void)
     //Serial.println(" TInc:");
     //Serial.println(uptime);
     //Serial.println(timp_inc);
-    Serial.println(moving_sp);
-    moving_sp = temp * (timp_inc-remaining)/timp_inc;
+    //Serial.println(moving_sp);
+    if(temp * (timp_inc-remaining)/timp_inc>20)
+      moving_sp = temp * (timp_inc-remaining)/timp_inc;
+    else
+      moving_sp = 20;
+    Serial.print("Temperatura dorita: ");Serial.println(moving_sp);
     remaining = timp_inc - uptime;
   }
   else if (uptime <= (timp_inc + timp_men))
   {
     //Serial.println(uptime);
     //Serial.println(timp_inc + timp_men);
-    Serial.println(moving_sp);
+    Serial.print("Temperatura dorita: ");Serial.println(moving_sp);
+    moving_sp = temp;
     remaining = (timp_inc + timp_men) - uptime;
   }
   else if (uptime <= (timp_inc + timp_men + timp_rac))
   {
     //Serial.println(uptime);
     //Serial.println(timp_inc + timp_men + timp_rac);
-    Serial.println(moving_sp);
+    Serial.print("Temperatura dorita: ");Serial.println(moving_sp);
     moving_sp = temp - temp * (timp_rac - remaining)/timp_rac;
     remaining = (timp_inc + timp_men + timp_rac) - uptime;
   }
@@ -341,17 +345,24 @@ ISR(TIMER1_COMPA_vect)
   print_menu(scroll_menu);
   calculare_moving_sp ();
   vout=analogRead(sensor);
-  tempc=(vout*300)/1023;
+  tempc=(vout*450)/1023;
   
- 
+  Serial.print("Temperatura citita de la senzor: ");Serial.println(tempc);
+  
   eroare = moving_sp - tempc;
  
   suma_erori= suma_erori + eroare * dt;
  
   derivativa = (eroare - eroare_anterioara) / dt ;
  
-  output = (pars.kp * eroare) + (pars.ki * suma_erori ) + (pars.kd * derivativa);
-   
+  output = (kp * eroare) + (ki * suma_erori ) + (kd * derivativa);
+  Serial.print("Eroare/Suma_erori/Derivata: ");Serial.print(eroare);Serial.print(" ");Serial.print(suma_erori);Serial.print(" "); Serial.print(derivativa);Serial.println(" ");
+  Serial.print("Output: ");Serial.println(output);
+  if(output<0)
+    output = 0;
+  else if(output>255)
+    output = 255;
+  
   eroare_anterioara = eroare;
  
   //Serial.println(uptime);
@@ -359,6 +370,6 @@ ISR(TIMER1_COMPA_vect)
   //Serial.println(eroare);
   //Serial.println(suma_erori);
   //Serial.println(derivativa);
-  Serial.println(output);
+  //Serial.print("Output final: "); Serial.println(output);
   analogWrite(6,output);
 }
